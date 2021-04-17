@@ -1,0 +1,105 @@
+---
+title: "Machine Learning"
+author: "Daniela Chávez"
+date: "16/4/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+The goal of your project is to predict the manner in which they did the exercise. This is the "classe" variable in the training set. You may use any of the other variables to predict with. You should create a report describing how you built your model, how you used cross validation, what you think the expected out of sample error is, and why you made the choices you did. You will also use your prediction model to predict 20 different test cases.
+
+#**Developing**
+Fist, libraries are loaded first. It's necessary to create a seed for reproducibility
+
+```{r}
+library(caret)
+library(dplyr)
+set.seed(1)
+```
+After, It is necessary to load the data for run the model
+```{r}
+fileTrain <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"
+download.file(fileTrain,destfile="Train1.csv",method="curl")
+train<-read.csv("Train1.csv",head=TRUE, na.strings=c("NA","#DIV/0!",""))
+names(train)
+dim(train)
+str(train$classe)
+#The variable x becomes a factor
+train$classe<-as.factor(train$classe)
+
+```
+Variables with missing data will be eliminated
+```{r}
+#counting NA's per column
+na_count <-sapply(train, function(train) sum(length(which(is.na(train)))))
+na_count<-data.frame(na_count)
+na_count
+#keep only columns that contains values in all rows 
+train2<-train[, colSums(is.na(train))==0]
+dim(train2)
+str(train2)
+#remove first 7 column unnecessary for predicting 
+train3<-train2[,-c(1:7)]
+dim(train3)
+str(train3)
+```
+After, data must be loaded to predict
+```{r}
+fileTest <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv"
+download.file(fileTest,destfile="Test1.csv",method="curl")
+test<-read.csv("Test1.csv",head=TRUE,na.strings=c("NA","#DIV/0!",""))
+dim(test)
+str(test)
+```
+We explore this data and the same adjustments are made applied to the other data set
+```{r}
+na_count2 <-sapply(test, function(test) sum(length(which(is.na(test)))))
+na_count2 <-data.frame(na_count2)
+na_count2
+#remove columns with NA
+NAindex <- apply(test,2,function(x) {sum(is.na(x))}) 
+test2 <- test[,which(NAindex == 0)]
+dim(test2)
+str(test2)
+#remove first 7 column unnecessary for predicting, it has 60 columns
+test3<-test2[,8:60]
+str(test3)
+dim(test3)
+```
+
+The data is split in training set and testing set
+```{r}
+trainset <- createDataPartition(train3$classe, p = 0.75, list = FALSE)
+Training <- train3[trainset, ]
+Testing <- train3[-trainset, ]
+```
+Cross validation will be done using the k nearest neighbors rule
+Cross-validation has been fixed in 5 parts. The data is divided into 5 subsamples of the same size. In turn, one of the subsamples is used as a test and the remaining 4 as training. The errors of the 5 turns are averaged and this is done for each value of k. The value that gives the best result is selected.
+```{r}
+control1<- trainControl(method="cv", 5)
+```
+Now, the model is run, with the function *train*. The first argument is the variable to be predicted (class), the second element the data.frame of the data, the third argument the classification method to use, in this case random forest (rf). The ntree argument is a hyperparameter
+```{r}
+rf.model <- train(classe ~ ., data=Training, method="rf",trControl=control1, ntree=100)
+rf.model
+rf.model$finalModel
+```
+It should be noted that "Accuracy" is the proportion of correct classifications and it's high (near to 1). The values reserved as Testing are executed in the prediction:
+```{r}
+rf.prdict<-predict(rf.model, Testing)
+```
+Fit metrics are calculated with cross validation whit Testing set
+```{r}
+confusionMatrix(Testing$classe,rf.prdict)
+```
+The model predicts 99.49% of the classes, now the 20 observation will be predicted
+```{r}
+testingPred <- predict(rf.model, test3)
+testingPred
+```
+Thanks for you attention
